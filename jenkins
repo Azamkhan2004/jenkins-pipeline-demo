@@ -1,45 +1,61 @@
-echo "pipeline {
-  agent any
+pipeline {
+    agent any
 
-  stages {
-    stage('Checkout') {
-      steps {
-        echo 'Checking out source...'
-        checkout scm
-      }
+    environment {
+        IMAGE_NAME = "jenkins-demo"
+        CONTAINER_NAME = "jenkins-demo"
     }
 
-    stage('Build Docker Image') {
-      steps {
-        echo 'Building Docker image...'
-        sh 'docker build -t jenkins-demo:latest .'
-      }
+    stages {
+
+        stage('Checkout') {
+            steps {
+                echo 'Checking out source...'
+                checkout scm
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                echo 'Building Docker image...'
+                sh "docker build -t ${IMAGE_NAME}:latest ."
+            }
+        }
+
+        stage('Test (smoke)') {
+            steps {
+                echo 'Running smoke test...'
+                sh """
+                docker run --rm ${IMAGE_NAME}:latest node -e "console.log('Smoke test passed!')"
+                """
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                echo 'Deploying container...'
+                // Stop and remove existing container if it exists
+                sh "docker rm -f ${CONTAINER_NAME} || true"
+                // Run new container
+                sh "docker run -d --name ${CONTAINER_NAME} -p 8080:8080 ${IMAGE_NAME}:latest"
+            }
+        }
+
+        stage('Verify') {
+            steps {
+                echo 'Verifying deployment...'
+                sh "docker ps | grep ${CONTAINER_NAME}"
+            }
+        }
+
     }
 
-    stage('Test (smoke)') {
-      steps {
-        echo 'Running smoke test...'
-        sh 'docker run --rm jenkins-demo:latest node -e \"console.log(\\\"Smoke test passed!\\\")\"'
-      }
+    post {
+        success {
+            echo "Pipeline completed successfully!"
+        }
+        failure {
+            echo "Pipeline failed. Check logs for details."
+        }
     }
-
-    stage('Deploy') {
-      steps {
-        echo 'Deploying container...'
-        sh '''
-          if [ \"$(docker ps -q -f name=jenkins-demo-container)\" ]; then
-            docker rm -f jenkins-demo-container || true
-          fi
-          docker run -d --name jenkins-demo-container -p 8080:8080 jenkins-demo:latest
-        '''
-      }
-    }
-
-    stage('Verify') {
-      steps {
-        echo 'Verifying running containers...'
-        sh 'docker ps -a'
-      }
-    }
-  }
-}" > Jenkinsfile
+}
