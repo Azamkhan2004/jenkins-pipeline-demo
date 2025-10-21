@@ -1,0 +1,2 @@
+echo "# Jenkins Pipeline Demo
+This project demonstrates a simple CI/CD pipeline using Jenkins and Docker." > README.md

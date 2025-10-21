@@ -1,0 +1,45 @@
+echo "pipeline {
+  agent any
+
+  stages {
+    stage('Checkout') {
+      steps {
+        echo 'Checking out source...'
+        checkout scm
+      }
+    }
+
+    stage('Build Docker Image') {
+      steps {
+        echo 'Building Docker image...'
+        sh 'docker build -t jenkins-demo:latest .'
+      }
+    }
+
+    stage('Test (smoke)') {
+      steps {
+        echo 'Running smoke test...'
+        sh 'docker run --rm jenkins-demo:latest node -e \"console.log(\\\"Smoke test passed!\\\")\"'
+      }
+    }
+
+    stage('Deploy') {
+      steps {
+        echo 'Deploying container...'
+        sh '''
+          if [ \"$(docker ps -q -f name=jenkins-demo-container)\" ]; then
+            docker rm -f jenkins-demo-container || true
+          fi
+          docker run -d --name jenkins-demo-container -p 8080:8080 jenkins-demo:latest
+        '''
+      }
+    }
+
+    stage('Verify') {
+      steps {
+        echo 'Verifying running containers...'
+        sh 'docker ps -a'
+      }
+    }
+  }
+}" > Jenkinsfile
